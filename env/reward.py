@@ -68,7 +68,7 @@ def calculate_reward(env, final_action):
     relative_price_change = (current_price-previous_price)/previous_price
     reward2 = relative_profit - relative_price_change
 
-    # reward3 is the difference between the relative profit change minus the relative price change on the last 7 time step
+    # reward3 is the difference between the relative profit change minus the relative price change on the last 5 time step
     balance_previous = env.dfs[asset].dict_df[env.metadata.TF]["df"]["balance"].values[env.current_index-5]
     relative_profit = (balance-balance_previous)/balance_previous
     current_price =  env.dfs[asset].dict_df[env.metadata.TF]["df"]["Close"].values[env.current_index]
@@ -76,9 +76,17 @@ def calculate_reward(env, final_action):
     relative_price_change = (current_price-previous_price)/previous_price
     reward3 = relative_profit - relative_price_change
 
+    # reward4 is the difference between the relative profit change minus the relative price change on the last 20 time step
+    balance_previous = env.dfs[asset].dict_df[env.metadata.TF]["df"]["balance"].values[env.current_index-3]
+    relative_profit = (balance-balance_previous)/balance_previous
+    current_price =  env.dfs[asset].dict_df[env.metadata.TF]["df"]["Close"].values[env.current_index]
+    previous_price = env.dfs[asset].dict_df[env.metadata.TF]["df"]["Close"].values[env.current_index-3]
+    relative_price_change = (current_price-previous_price)/previous_price
+    reward4 = relative_profit - relative_price_change
+
     # reward4 gives penaty if too few trades
-    max_step_without_trade = 20
-    reward4 = min(0.,(max_step_without_trade - env.step_since_last_trade)/(env.metadata.max_step - max_step_without_trade))
+    #max_step_without_trade = 20
+    #reward4 = min(0.,(max_step_without_trade - env.step_since_last_trade)/(env.metadata.max_step - max_step_without_trade))
 
     # reward5 based on a simple sharpe ratio
     profits = np.divide(np.diff(env.df_reward[asset]["balance"].values[env.init_index:env.current_index+1]) ,
@@ -144,12 +152,12 @@ def calculate_reward(env, final_action):
     coef_0 = 0.
     coef_1 = 0.
     coef_2 = 0.
-    coef_3 = 1.
+    coef_3 = 0.
     coef_4 = 0.
     coef_5 = 0.
     coef_6 = 0.
     coef_7 = 0.
-    coef_8 = 0.
+    coef_8 = 8.
     coef_9 = 0.
     coef_10 = 0.
     ##################################################

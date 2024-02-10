@@ -24,12 +24,18 @@ def make_env(metadata, data, rank, seed=0):
     :param seed: (int) the inital seed for RNG
     :param rank: (int) index of the subprocess
     """
-    def _init():
+    """def _init():
         env = TradingEnvironment(metadata, data, seed)
         #check_env(env)
         env.seed(seed + rank)
         return env
-    set_random_seed(seed)
+    set_random_seed(seed)"""
+    def _init():
+        env = TradingEnvironment(metadata, data, seed+rank)
+        #check_env(env)
+        env.seed(seed + rank)
+        return env
+    set_random_seed(seed+rank)
     return _init
 
 class TradingEnvironment(gym.Env):
@@ -384,14 +390,14 @@ class TradingEnvironment(gym.Env):
             #    pass
 
         # for prediction, save results in a separate file and cancel stop
-        if self.metadata.mode == "predict":
+        if self.metadata.mode == "predict" and idx >= (self.df_eval[asset].shape[0]-10):
             self.df_eval[asset].to_csv(LOG_DIR+"/"+"df_eval_"+self.metadata.suffix+".csv")
             done = False
 
         return obs, reward, done, info
 
     def reset(self):
-        #print("start reset")
+        print("start reset")
         # save on file recorded behavior every episode
         """try:
             self.df_eval.to_csv('./tmp/result_'+str(self.iteration)+'.csv')
