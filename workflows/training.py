@@ -14,7 +14,10 @@ from dotenv import dotenv_values
 config = dotenv_values("config.env")
 LOG_DIR = config["LOG_DIR"]
 
-def linear_schedule(initial_value: float, total_timesteps: int) -> Callable[[float], float]:
+def linear_schedule(initial_value: float, 
+                    total_timesteps: int, 
+                    start_timestep: int, 
+                    end_timestep: int = None):# -> Callable[[float], float]:
     """
     Linear learning rate schedule.
 
@@ -22,6 +25,14 @@ def linear_schedule(initial_value: float, total_timesteps: int) -> Callable[[flo
     :return: schedule that computes
       current learning rate depending on remaining progress
     """
+ 
+
+    #print("start_timestep 2 :", start_timestep)
+    #start_timestep_dict = {"value": start_timestep}
+    # initialize
+    if end_timestep is None:
+        end_timestep = total_timesteps
+
     def func(progress_remaining: float) -> float:
         """
         Progress will decrease from 1 (beginning) to 0.
@@ -29,31 +40,43 @@ def linear_schedule(initial_value: float, total_timesteps: int) -> Callable[[flo
         :param progress_remaining:
         :return: current learning rate
         """
-        """pivot = 0.5
-        max_decrease = 10
-        learning_rate = initial_value
+        #nonlocal start_timestep_dict, start_timestep
+        #print("start_timestep_dict[value]", start_timestep_dict["value"])
+        #start_timestep = start_timestep_dict["value"]
+        # update timestep count to the real number of time step
+   
+        print("start_timestep 3", start_timestep)
+        print("total_timesteps", total_timesteps)
+        print("end_timestep", end_timestep)
+        print("initial_value", initial_value)
         print("progress_remaining", progress_remaining)
-        progress = max(0., min(1., progress_remaining))
-        if progress < pivot:
-            alpha = (pivot - progress) / pivot
-            learning_rate = (1.0 - alpha) * initial_value + alpha * initial_value / max_decrease"""
+        
+        total_timesteps_global = max(end_timestep, start_timestep + total_timesteps)
+        print("total_timesteps_global", total_timesteps_global)
 
-        #schedule = [(150000, 1), (250000, 10), (300000, 100)] for 300,000 steps #[(200000, 1), (350000, 10), (500000, 100)]
-        #schedule = [(200000, 1), (350000, 10), (500000, 100)] # for 500,000 steps
-        #schedule = [(400000, 1), (700000, 10), (1000000, 100)] # for 1,000,000 steps
+        # update progress_remaining
+        progress_remaining_global = (float(total_timesteps_global) - float(start_timestep) - ((1. - progress_remaining) * total_timesteps)) \
+                                     /float(total_timesteps_global)
+        print("progress_remaining_global", progress_remaining_global)
+
         # define shcedule as a function of total number of steps
-        schedule = [(int(float(total_timesteps)*0.4), 1),
-                    (int(float(total_timesteps)*0.7), 10),
-                    (total_timesteps, 100)]
+        schedule = [(int(float(total_timesteps_global)*0.7), 1),
+                    (int(float(total_timesteps_global)*0.85), 10),
+                    (total_timesteps_global, 100)]
+        print("schedule", schedule)
         if len(schedule) > 0:
-            if schedule[-1][0] < total_timesteps:
-                schedule.append((total_timesteps*10, schedule[-1][1]))
-        current_timestep = (1. - max(0., min(1., progress_remaining))) * total_timesteps
+            if schedule[-1][0] < total_timesteps_global:
+                schedule.append((total_timesteps_global*10, schedule[-1][1]))
+        current_timestep = (1. - max(0., min(1., progress_remaining_global))) * total_timesteps_global
+        print("current_timestep", current_timestep)
+        print("current_timestep", current_timestep)
         learning_rate = initial_value
         for i in range(len(schedule)-1):
             if current_timestep >= schedule[i][0] and current_timestep < schedule[i+1][0]: 
                 alpha = min(1., max(0., (current_timestep - schedule[i][0]) / (schedule[i+1][0] - schedule[i][0])))
+                print("alpha", alpha)
                 learning_rate = initial_value / schedule[i+1][1] * alpha + initial_value / schedule[i][1] * (1. - alpha)
+        print("learning_rate", learning_rate)
         return learning_rate
 
     return func
@@ -62,7 +85,7 @@ def linear_schedule(initial_value: float, total_timesteps: int) -> Callable[[flo
 def run_training(metadata, data, algo, default_param, num_cpu, total_timesteps,
                 info_keywords = [], flag_use_opt_hyperparam = True,
                 flag_use_opt_env = True, stats_path = "./", run_code = "",
-                flag_new_model = True):
+                flag_new_model = True, seed_env = 0, start_timestep = 0, end_timestep = None):
     """ function to train RL models
     Input:
     - metadata : information to setup the environment
@@ -87,10 +110,13 @@ def run_training(metadata, data, algo, default_param, num_cpu, total_timesteps,
             kwargs.update(organise_hyperparam(json.load(fp)))
 
     # reduce learning rate towards the end
-    print(kwargs["learning_rate"])
-    print("kwargs[learning_rate] before", kwargs["learning_rate"])
-    kwargs["learning_rate"] = linear_schedule(kwargs["learning_rate"], total_timesteps)
-    print("kwargs[learning_rate] after", kwargs["learning_rate"])
+    kwargs["learning_rate"] = kwargs["learning_rate"]
+    """kwargs["learning_rate"] = linear_schedule(kwargs["learning_rate"],
+                                              total_timesteps,
+                                              start_timestep = start_timestep,
+                                              end_timestep = end_timestep)"""
+    print("learning_rate", kwargs["learning_rate"])
+    #raise()
 
     # load optimum env parameter
     if flag_use_opt_env and Path("best_envparams.json").is_file():
@@ -99,24 +125,79 @@ def run_training(metadata, data, algo, default_param, num_cpu, total_timesteps,
 
     # create environment
     env = DummyVecEnv([make_env(copy.deepcopy(metadata),
-                                copy.deepcopy(data), i) for i in range(num_cpu)])
+                                copy.deepcopy(data), i, seed_env) for i in range(num_cpu)])
     env = VecNormalize(env)
     env = VecMonitor(env, filename = "tmp/TestMonitor",
                             info_keywords = info_keywords)
     kwargs["env"] = env
 
-    print("kwargs: ", kwargs)
     # Select model
     if flag_new_model:
         if algo == "RecurrentPPO":
             model = RecurrentPPO(**kwargs, tensorboard_log="./tensorboard/")
     else:
         if algo == "RecurrentPPO":
-            model = RecurrentPPO.load("model_"+run_code)
+            """env = DummyVecEnv([make_env(copy.deepcopy(metadata),
+                                        copy.deepcopy(data), 0)] )
+            env = VecNormalize.load(stats_path, env)
+            # do not update the moving avergae of the vector normalization during prediction 
+            env.training = False
+            # reward normalization in te vector normalization is not needed during prediction
+            env.norm_reward = False"""
+            model = RecurrentPPO.load(LOG_DIR+"/"+"model_"+run_code)
+
+            model.learning_rate = kwargs["learning_rate"]
+            model._setup_lr_schedule()
+            """env = DummyVecEnv([make_env(copy.deepcopy(metadata),
+                                            copy.deepcopy(data), 0)] )
+            env = VecNormalize.load(stats_path, env)
+            env = env.reset()"""
+
+            env = DummyVecEnv([make_env(copy.deepcopy(metadata),
+                                        copy.deepcopy(data), i, seed_env) for i in range(num_cpu)])
+            env = VecNormalize(env)
+            #env = VecNormalize.load(stats_path, env)
+            env = VecMonitor(env, filename = "tmp/TestMonitor",
+                                    info_keywords = info_keywords)
+            #env = pickle.load(open(stats_path, 'rb'))
+            env.reset()
+
+            model.env = env
+            print("Loaded model and env")
+            #model = RecurrentPPO.load(LOG_DIR+"/"+"model_"+run_code)
 
     # train        
-    model.learn(total_timesteps=total_timesteps, log_interval=True, progress_bar=True)
+    print("flag_new_model", flag_new_model)
+    model.learn(total_timesteps=total_timesteps, log_interval=True, progress_bar=True, reset_num_timesteps=flag_new_model)
 
     # save trained model and environment
     model.save(LOG_DIR+"/"+"model_"+run_code)
+    
+    env = model.get_env()
+    #import pickle
+    #pickle.dump(env, open(stats_path, 'wb'))
     env.save(stats_path)
+
+
+    #env.save(stats_path)
+    #model.env.save(stats_path)
+    del model
+    del env
+    #model = RecurrentPPO.load(LOG_DIR+"/"+"model_"+run_code)
+    """env = DummyVecEnv([make_env(copy.deepcopy(metadata),
+                                copy.deepcopy(data), 0)] )
+    env = VecNormalize.load(stats_path, env)
+    model.env = env"""
+    # create environment
+    """env = DummyVecEnv([make_env(copy.deepcopy(metadata),
+                                copy.deepcopy(data), i) for i in range(num_cpu)])
+    env = VecNormalize(env)
+    env = VecMonitor(env, filename = "tmp/TestMonitor",
+                            info_keywords = info_keywords)
+    env.reset()
+    
+    model.env = env
+    #kwargs["env"] = env
+    print("learn 2")
+    model.learn(total_timesteps=total_timesteps, log_interval=True, progress_bar=True, reset_num_timesteps=False)"""
+ 

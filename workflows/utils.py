@@ -87,7 +87,8 @@ def get_metrics(suffix, code, tick):
     if A < B:
         price_balance_penalty = -1
     # final relative balance
-    final_relative_balance = A-B
+    #final_relative_balance = A-B
+    final_relative_balance = A-min(B, 0.0)
 
     return cumulative_return, mean_relative_variation, price_balance_penalty, df_eval, final_relative_balance
 

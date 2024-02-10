@@ -9,7 +9,8 @@ from workflows.objective import objective_hyperparam
 
 def run_hyperparam_opt(metadata, data_train, data_val, algo,
      default_param, num_cpu, info_keywords = [], timeout = 3600*8, n_trials = 50,
-     flag_load_study = False, flag_use_opt_env = True, total_timesteps = 30000):
+     flag_load_study = False, flag_use_opt_env = True, total_timesteps = 30000, 
+     flag_plot = False):
     """ function to run an optimization of some environment parameter.
     Input: 
     - df_train : dataframe for training
@@ -40,7 +41,7 @@ def run_hyperparam_opt(metadata, data_train, data_val, algo,
     study.optimize(lambda trial: objective_hyperparam(trial, default_param, metadata,
                                                 data_train, data_val, num_cpu, study, 
                                                 algo, total_timesteps, info_keywords,
-                                                flag_use_opt_env),
+                                                flag_use_opt_env, flag_plot),
                                 n_trials=n_trials, timeout=timeout)
 
     # save best parameter in file

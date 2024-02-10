@@ -286,6 +286,7 @@ def generate_data(list_asset_name, list_TF, time_feat, lowest_TF, n_step_LTF, ma
         for asset_name in list_asset_name:
             list_of_list_feat.append(data[asset_name].dict_df[TF]["list_feat"])
         list_feat = list(set(list_of_list_feat[0]).intersection(*list_of_list_feat[1:]))
+        list_feat.sort()
         for asset_name in list_asset_name:
             data[asset_name].dict_df[TF]["list_feat"] = copy.deepcopy(list_feat)
         

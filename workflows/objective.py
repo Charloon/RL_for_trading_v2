@@ -37,7 +37,8 @@ def sample_rPPO_params(trial: optuna.Trial):
     }
 
 def objective_hyperparam(trial, default_param, metadata, data_train, data_val,
-                         num_cpu, study, algo, total_timesteps, info_keywords, flag_use_opt_env):
+                         num_cpu, study, algo, total_timesteps, info_keywords, flag_use_opt_env,
+                         flag_plot):
     """ objecive function for the hyperparameter optimization
     Input: 
     - trial : Optuna sampling of parameters
@@ -53,6 +54,7 @@ def objective_hyperparam(trial, default_param, metadata, data_train, data_val,
     - total_timesteps : total number of steps for each training
     - info_keywords : list of string for additional output to the parameter optimisation 
     - flag_use_opt_env : boolean to use optimise parameter for the environment
+    - flag_plot : boolean to plot result from prediction 
     """
     # export study to follow on optimization progress
     export_study_to_csv(study, name = 'study.pkl', suffix = "hyperparam")
@@ -90,7 +92,7 @@ def objective_hyperparam(trial, default_param, metadata, data_train, data_val,
     # value to maximize
     metric = mean_relative_var_valid + price_balance_penalty_valid"""
 
-    list_metric_train, list_metric_valid, list_metric_test = parallel_predict(metadata, None, data_val, None, algo, stats_path, code)
+    list_metric_train, list_metric_valid, list_metric_test = parallel_predict(metadata, None, data_val, None, algo, stats_path, code, flag_plot)
     return np.mean(list_metric_valid)
 
 def sample_env_params(trial: optuna.Trial):
@@ -144,7 +146,8 @@ def sample_env_params(trial: optuna.Trial):
         }
 
 def objective_envparam(trial, default_param, metadata, data_train, data_val,
-            num_cpu, study, algo, total_timesteps, info_keywords, flag_use_opt_hyperparam):
+            num_cpu, study, algo, total_timesteps, info_keywords, flag_use_opt_hyperparam,
+            flag_plot):
     """ objecive function for the hyperparameter optimization
     Input: 
     - trial : Optuna sampling of parameters
@@ -160,6 +163,7 @@ def objective_envparam(trial, default_param, metadata, data_train, data_val,
     - total_timesteps : total number of steps for each training
     - info_keywords : list of string for additional output to the parameter optimisation 
     - flag_use_opt_hyperparam : boolean to use optimise hyperparameter of the RL algorithm
+    - flag_plot : boolean to plot prediction results
     """
     # export study to csv
     export_study_to_csv(study, name = 'study_env.pkl', suffix = "env")
@@ -202,6 +206,6 @@ def objective_envparam(trial, default_param, metadata, data_train, data_val,
 
     return metric"""
 
-    list_metric_train, list_metric_valid, list_metric_test = parallel_predict(metadata, None, data_val, None, algo, stats_path, code)
+    list_metric_train, list_metric_valid, list_metric_test = parallel_predict(metadata, None, data_val, None, algo, stats_path, code, flag_plot)
 
     return np.mean(list_metric_valid)

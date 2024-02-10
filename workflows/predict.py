@@ -4,6 +4,7 @@ import copy
 import plotly.graph_objects as go
 import multiprocessing as mp
 import pandas as pd
+import time
 from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
 from sb3_contrib import RecurrentPPO
 from env.trading_environment import make_env
@@ -16,7 +17,7 @@ from dotenv import dotenv_values
 config = dotenv_values("config.env")
 LOG_DIR = config["LOG_DIR"]
 
-def parallel_predict(metadata, data_train, data_valid, data_test, algo, stats_path, code = ""):
+def parallel_predict(metadata, data_train, data_valid, data_test, algo, stats_path, code = "", flag_plot = True):
     """
     Fonction to run prediction in parallel
     Input:
@@ -53,17 +54,17 @@ def parallel_predict(metadata, data_train, data_valid, data_test, algo, stats_pa
         if data_train is not None:
             list_runs.append(("train", pool.apply_async(predict_and_vizualize, args = (copy.deepcopy(asset), copy.deepcopy(metadata),
                                             copy.deepcopy(data_train), copy.deepcopy(algo), 
-                                            copy.deepcopy(stats_path), "train", code))))
+                                            copy.deepcopy(stats_path), "train", code, flag_plot))))
             #list_metric_train = [x.get() for x in list_runs_train]
         if data_valid is not None:
             list_runs.append(("valid", pool.apply_async(predict_and_vizualize, args = (copy.deepcopy(asset), copy.deepcopy(metadata),
                                             copy.deepcopy(data_valid), copy.deepcopy(algo), 
-                                            copy.deepcopy(stats_path), "valid", code))))
+                                            copy.deepcopy(stats_path), "valid", code, flag_plot))))
             #list_metric_valid = [x.get() for x in list_runs_valid]
         if data_test is not None:
             list_runs.append(("test", pool.apply_async(predict_and_vizualize, args = (copy.deepcopy(asset), copy.deepcopy(metadata),
                                             copy.deepcopy(data_test), copy.deepcopy(algo), 
-                                            copy.deepcopy(stats_path), "test", code))))
+                                            copy.deepcopy(stats_path), "test", code, flag_plot))))
             #list_metric_test = [x.get() for x in list_runs_test]
             
     list_metric_train = [x[1].get() for x in list_runs if x[0] == "train"]
@@ -71,9 +72,10 @@ def parallel_predict(metadata, data_train, data_valid, data_test, algo, stats_pa
     list_metric_test = [x[1].get() for x in list_runs if x[0] == "test"]
     pool.close()
     pool.join()
+    pool.terminate()
     return list_metric_train, list_metric_valid, list_metric_test
 
-def predict_and_vizualize(asset, metadata, data, algo, stats_path, suffix, code = ""):
+def predict_and_vizualize(asset, metadata, data, algo, stats_path, suffix, code = "", flag_plot = True):
     """
     Fonction to run prediction and vizualize
     Input:
@@ -84,8 +86,11 @@ def predict_and_vizualize(asset, metadata, data, algo, stats_path, suffix, code 
     -   stats_path : path to save the environent
     """
     metadata.account.name = asset
+    # run prediction
     run_predict(metadata, data, algo, stats_path, suffix, run_code = code)
-    visualize_predict(suffix = suffix, tick = asset, code = code)   
+    # plot results
+    if flag_plot:
+        visualize_predict(suffix = suffix, tick = asset, code = code)   
     # get metrics
     _ , mean_relative_var_valid, price_balance_penalty_valid, _ , final_relative_balance\
                 = get_metrics(suffix = suffix, code = code, tick = asset)
@@ -106,6 +111,7 @@ def run_predict(metadata, data, algo, stats_path, suffix, run_code = ""):
     - suffix : string to indicate what type of data we are predicting (train, valid)
     - run_code :  unique code to identify the model"""
 
+    time0 = time.time()
     clean_results_folder()
     # load model
     if algo == "RecurrentPPO":
@@ -144,10 +150,14 @@ def run_predict(metadata, data, algo, stats_path, suffix, run_code = ""):
             obs, _ , dones , _ = env.step(action)
             episode_starts = np.zeros((num_envs,), dtype=bool) #dones
         except Exception as error:
-            print(error)
-            print("Done!")
+            #print(error)
+            print("Prediction done!")
             done = True
             pass
+
+    time1 = time.time()
+    print("time spent:", time1-time0, "s")
+    return
 
 def vizualize_prediction_summary(list_metric_train, list_metric_valid, list_metric_test):
 
